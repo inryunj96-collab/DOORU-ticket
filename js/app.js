@@ -551,19 +551,19 @@ async function renderTicketRegister(eventId, actorName) {
       <div class="preview-list">
         ${parsedRows.map((row, i) => `
           <div class="preview-row" data-idx="${i}">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-              <span style="flex-shrink: 0; font-weight: 700; color: #666; min-width: 24px;">${i + 1}.</span>
-              <button type="button" class="icon-btn preview-remove" data-remove="${i}" style="margin-left: auto;">✕</button>
-            </div>
-            <div class="preview-row-fields">
-              <div>
-                <label style="font-size: 0.75rem; color: #666; font-weight: 500; display: block; margin-bottom: 4px;">PIN</label>
-                <input class="input input-small" data-field="pin" value="${escapeHtml(row.pin)}" placeholder="PIN 번호" />
+            <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px;">
+              <span style="flex-shrink: 0; font-weight: 700; color: #666; min-width: 24px; padding-top: 4px;">${i + 1}.</span>
+              <div class="preview-row-fields" style="display: flex; gap: 10px; flex: 1;">
+                <div style="flex: 1;">
+                  <label style="font-size: 0.75rem; color: #666; font-weight: 500; display: block; margin-bottom: 4px;">PIN</label>
+                  <input class="input" data-field="pin" value="${escapeHtml(row.pin)}" placeholder="PIN 번호" style="width: 100%;" />
+                </div>
+                <div style="flex: 1.5;">
+                  <label style="font-size: 0.75rem; color: #666; font-weight: 500; display: block; margin-bottom: 4px;">링크</label>
+                  <input class="input" data-field="url" value="${escapeHtml(row.url)}" placeholder="티켓 링크" style="width: 100%;" />
+                </div>
               </div>
-              <div>
-                <label style="font-size: 0.75rem; color: #666; font-weight: 500; display: block; margin-bottom: 4px;">링크</label>
-                <input class="input input-small" data-field="url" value="${escapeHtml(row.url)}" placeholder="티켓 링크" />
-              </div>
+              <button type="button" class="btn btn-small btn-ghost" data-remove="${i}" style="flex-shrink: 0; margin-top: 20px;">삭제</button>
             </div>
           </div>
         `).join('')}
