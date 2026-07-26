@@ -697,23 +697,41 @@ function renderAssignedTicket(event, ticket, actorName, totalCount, remainCount,
       <div class="ticket-card">
         <div class="pin-label">PIN 번호</div>
         <div class="pin-display">${escapeHtml(ticket.pin)}</div>
-        <a href="${escapeHtml(ticket.url)}" target="_blank" rel="noopener" class="btn btn-primary btn-large btn-block">🎟 티켓 받기 (링크 열기)</a>
+        <button id="btn-receive-ticket" class="btn btn-primary btn-large btn-block">🎟 티켓 받기 (링크 열기)</button>
       </div>
-      <button id="btn-confirm-received" class="btn btn-secondary btn-large btn-block">✓ 수령 완료</button>
       <button id="btn-swap" class="btn btn-ghost btn-block">다른 티켓 받기</button>
     </section>
   `;
 
-  const confirmBtn = document.getElementById('btn-confirm-received');
-  if (confirmBtn) {
-    confirmBtn.addEventListener('click', async () => {
-      await DB.updateTicket(ticket.id, {
-        status: 'claimed',
-        receivedBy: actorName,
-        receivedAt: new Date().toISOString(),
+  const receiveBtn = document.getElementById('btn-receive-ticket');
+  if (receiveBtn) {
+    receiveBtn.addEventListener('click', () => {
+      openModal(`
+        <h3>티켓 수령 확인</h3>
+        <p class="hint" style="margin-top: 8px;">티켓을 수령하시겠습니까?</p>
+        <div class="modal-actions">
+          <button id="modal-cancel" class="btn btn-ghost">취소</button>
+          <button id="modal-confirm" class="btn btn-primary">확인</button>
+        </div>
+      `);
+
+      document.getElementById('modal-cancel').addEventListener('click', closeModal);
+      document.getElementById('modal-confirm').addEventListener('click', async () => {
+        try {
+          await DB.updateTicket(ticket.id, {
+            status: 'claimed',
+            receivedBy: actorName,
+            receivedAt: new Date().toISOString(),
+          });
+          closeModal();
+          toast('티켓 수령을 완료했습니다.');
+          window.open(ticket.url, '_blank', 'noopener,noreferrer');
+          navigate({ view: 'event-detail', eventId: eventId }, { replace: true });
+        } catch (err) {
+          toast('오류가 발생했습니다.');
+          closeModal();
+        }
       });
-      toast('티켓 수령을 완료했습니다.');
-      navigate({ view: 'event-detail', eventId: eventId }, { replace: true });
     });
   }
 
@@ -727,18 +745,12 @@ function renderAssignedTicket(event, ticket, actorName, totalCount, remainCount,
       const newRemain = allTickets.filter((t) => t.status === 'unclaimed').length;
       const free = allTickets.find((t) => t.status === 'unclaimed' && t.id !== ticket.id);
       if (!free) {
-        await DB.updateTicket(ticket.id, {
-          status: 'claimed', receivedBy: actorName, receivedAt: new Date().toISOString(),
-        });
         toast('다른 미수령 티켓이 없습니다.');
-        renderAssignedTicket(event, ticket, actorName, newTotal, newRemain - 1, eventId);
+        renderAssignedTicket(event, ticket, actorName, newTotal, newRemain, eventId);
         return;
       }
-      const newTicket = await DB.updateTicket(free.id, {
-        status: 'claimed', receivedBy: actorName, receivedAt: new Date().toISOString(),
-      });
       toast('다른 티켓이 배정되었습니다.');
-      renderAssignedTicket(event, newTicket, actorName, newTotal, newRemain - 1, eventId);
+      renderAssignedTicket(event, free, actorName, newTotal, newRemain, eventId);
     } catch (err) {
       toast('오류가 발생했습니다. 다시 시도해주세요.');
       renderAssignedTicket(event, ticket, actorName, totalCount, remainCount, eventId);
