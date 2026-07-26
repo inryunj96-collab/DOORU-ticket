@@ -2,6 +2,53 @@ import { APP_PASSWORD, ADMIN_PASSWORD, TEAMS, getStadium } from './config.js';
 import { DB } from './storage.js';
 import { parseNolMessages } from './parser.js';
 
+// ---------- 테마 설정 ----------
+
+function initTheme() {
+  const savedTheme = localStorage.getItem('app-theme') || 'default';
+  applyTheme(savedTheme);
+}
+
+function applyTheme(theme) {
+  if (theme === 'default') {
+    document.documentElement.removeAttribute('data-theme');
+  } else {
+    document.documentElement.setAttribute('data-theme', theme);
+  }
+  localStorage.setItem('app-theme', theme);
+  updateThemeMenuButtons(theme);
+}
+
+function updateThemeMenuButtons(theme) {
+  document.querySelectorAll('.theme-option').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.theme === theme);
+  });
+}
+
+function setupThemeMenu() {
+  const themeBtn = document.getElementById('btn-theme');
+  const themeMenu = document.getElementById('theme-menu');
+
+  if (themeBtn && themeMenu) {
+    themeBtn.addEventListener('click', () => {
+      themeMenu.hidden = !themeMenu.hidden;
+    });
+
+    document.addEventListener('click', (e) => {
+      if (e.target !== themeBtn && !themeMenu.contains(e.target)) {
+        themeMenu.hidden = true;
+      }
+    });
+
+    document.querySelectorAll('.theme-option').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        applyTheme(btn.dataset.theme);
+        themeMenu.hidden = true;
+      });
+    });
+  }
+}
+
 // ---------- 공통 유틸 ----------
 
 function escapeHtml(str) {
@@ -826,6 +873,7 @@ async function renderStatus(eventId) {
   });
   app.querySelectorAll('[data-reset-ticket]').forEach((btn) => {
     btn.addEventListener('click', async () => {
+      if (!confirm('티켓 수령 내역을 초기화하시겠습니까?')) return;
       await DB.updateTicket(btn.dataset.resetTicket, {
         status: 'unclaimed',
         receivedBy: null,
@@ -944,4 +992,6 @@ async function openTicketEditModal(ticketId, eventId) {
 
 // ---------- 시작 ----------
 
+initTheme();
+setupThemeMenu();
 navigate({ view: 'home' }, { replace: true });
