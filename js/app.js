@@ -257,7 +257,7 @@ async function eventCardHtml(event) {
         <div class="event-card-meta">${escapeHtml(formatEventDate(event))}</div>
         <div class="event-card-meta">${escapeHtml(event.stadium)}</div>
       </div>
-      <div class="event-card-stats">${totalCount}장 (${receivedCount}건)</div>
+      <div class="event-card-stats">${totalCount}장 (${receivedCount}건 완료)</div>
       <div class="event-card-dday">${escapeHtml(dayStr)}</div>
     </button>
   `;
