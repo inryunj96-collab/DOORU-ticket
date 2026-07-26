@@ -624,8 +624,8 @@ async function renderTicketReceive(eventId, actorName) {
   let mine = tickets.find((t) => t.status === 'claimed' && norm(t.receivedBy) === norm(actorName));
 
   if (!mine) {
-    const free = tickets.find((t) => t.status === 'unclaimed');
-    if (!free) {
+    mine = tickets.find((t) => t.status === 'unclaimed');
+    if (!mine) {
       app.innerHTML = `
         <section class="view">
           <h2 class="section-title">티켓 수령 — ${escapeHtml(event.title)}</h2>
@@ -635,15 +635,12 @@ async function renderTicketReceive(eventId, actorName) {
       `;
       return;
     }
-    mine = await DB.updateTicket(free.id, {
-      status: 'claimed', receivedBy: actorName, receivedAt: new Date().toISOString(),
-    });
   }
 
-  renderAssignedTicket(event, mine, actorName, totalCount, unclaimedCount - 1);
+  renderAssignedTicket(event, mine, actorName, totalCount, unclaimedCount, eventId);
 }
 
-function renderAssignedTicket(event, ticket, actorName, totalCount, remainCount) {
+function renderAssignedTicket(event, ticket, actorName, totalCount, remainCount, eventId) {
   app.innerHTML = `
     <section class="view ticket-display">
       <h2 class="section-title">${escapeHtml(event.title)}</h2>
@@ -654,9 +651,23 @@ function renderAssignedTicket(event, ticket, actorName, totalCount, remainCount)
         <div class="pin-display">${escapeHtml(ticket.pin)}</div>
         <a href="${escapeHtml(ticket.url)}" target="_blank" rel="noopener" class="btn btn-primary btn-large btn-block">🎟 티켓 받기 (링크 열기)</a>
       </div>
+      <button id="btn-confirm-received" class="btn btn-secondary btn-large btn-block">✓ 수령 완료</button>
       <button id="btn-swap" class="btn btn-ghost btn-block">다른 티켓 받기</button>
     </section>
   `;
+
+  const confirmBtn = document.getElementById('btn-confirm-received');
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', async () => {
+      await DB.updateTicket(ticket.id, {
+        status: 'claimed',
+        receivedBy: actorName,
+        receivedAt: new Date().toISOString(),
+      });
+      toast('티켓 수령을 완료했습니다.');
+      navigate({ view: 'event-detail', eventId: eventId }, { replace: true });
+    });
+  }
 
   const swapBtn = document.getElementById('btn-swap');
   swapBtn.addEventListener('click', async () => {
@@ -672,17 +683,17 @@ function renderAssignedTicket(event, ticket, actorName, totalCount, remainCount)
           status: 'claimed', receivedBy: actorName, receivedAt: new Date().toISOString(),
         });
         toast('다른 미수령 티켓이 없습니다.');
-        renderAssignedTicket(event, ticket, actorName, newTotal, newRemain - 1);
+        renderAssignedTicket(event, ticket, actorName, newTotal, newRemain - 1, eventId);
         return;
       }
       const newTicket = await DB.updateTicket(free.id, {
         status: 'claimed', receivedBy: actorName, receivedAt: new Date().toISOString(),
       });
       toast('다른 티켓이 배정되었습니다.');
-      renderAssignedTicket(event, newTicket, actorName, newTotal, newRemain - 1);
+      renderAssignedTicket(event, newTicket, actorName, newTotal, newRemain - 1, eventId);
     } catch (err) {
       toast('오류가 발생했습니다. 다시 시도해주세요.');
-      renderAssignedTicket(event, ticket, actorName, totalCount, remainCount);
+      renderAssignedTicket(event, ticket, actorName, totalCount, remainCount, eventId);
     }
   });
 }
@@ -766,12 +777,6 @@ async function renderStatus(eventId) {
     </section>
   `;
 
-  const parseResult = (result) => {
-    if (!result) return { home: '', away: '' };
-    const match = result.match(/^([^:]+)\s+(\d+)\s*:\s*(.+)\s+(\d+)$/);
-    return match ? { home: match[2], away: match[4] } : { home: '', away: '' };
-  };
-
   if (event.result) {
     const resultDisplay = document.getElementById('result-display');
     if (resultDisplay) {
@@ -820,16 +825,14 @@ async function renderStatus(eventId) {
     btn.addEventListener('click', () => openTicketEditModal(btn.dataset.editTicket, eventId));
   });
   app.querySelectorAll('[data-reset-ticket]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      openAdminPasswordModal(async () => {
-        await DB.updateTicket(btn.dataset.resetTicket, {
-          status: 'unclaimed',
-          receivedBy: null,
-          receivedAt: null,
-        });
-        toast('수령 상태를 초기화했습니다.');
-        renderStatus(eventId);
+    btn.addEventListener('click', async () => {
+      await DB.updateTicket(btn.dataset.resetTicket, {
+        status: 'unclaimed',
+        receivedBy: null,
+        receivedAt: null,
       });
+      toast('수령 상태를 초기화했습니다.');
+      renderStatus(eventId);
     });
   });
   app.querySelectorAll('[data-delete-ticket]').forEach((btn) => {
