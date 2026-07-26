@@ -384,11 +384,16 @@ async function renderEventForm(eventId) {
           ${teamOptions}
         </select>
 
-        <label class="field-label" for="f-date">날짜 *</label>
-        <input id="f-date" class="input" type="date" required value="${event?.date ?? ''}" />
-
-        <label class="field-label" for="f-time">시간 *</label>
-        <input id="f-time" class="input" type="time" required value="${event?.time ?? ''}" />
+        <div class="form-row">
+          <div class="form-col">
+            <label class="field-label" for="f-date">날짜 *</label>
+            <input id="f-date" class="input" type="date" required value="${event?.date ?? ''}" />
+          </div>
+          <div class="form-col">
+            <label class="field-label" for="f-time">시간 *</label>
+            <input id="f-time" class="input" type="time" required value="${event?.time ?? ''}" />
+          </div>
+        </div>
 
         <label class="field-label" for="f-stadium">구장 *</label>
         <input id="f-stadium" class="input" required placeholder="예: 잠실야구장" value="${escapeHtml(event?.stadium ?? '')}" />
