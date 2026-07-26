@@ -551,11 +551,20 @@ async function renderTicketRegister(eventId, actorName) {
       <div class="preview-list">
         ${parsedRows.map((row, i) => `
           <div class="preview-row" data-idx="${i}">
-            <div class="preview-row-fields">
-              <input class="input input-small" data-field="pin" value="${escapeHtml(row.pin)}" placeholder="PIN" />
-              <input class="input input-small" data-field="url" value="${escapeHtml(row.url)}" placeholder="링크" />
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <span style="flex-shrink: 0; font-weight: 700; color: #666; min-width: 24px;">${i + 1}.</span>
+              <button type="button" class="icon-btn preview-remove" data-remove="${i}" style="margin-left: auto;">✕</button>
             </div>
-            <button type="button" class="icon-btn preview-remove" data-remove="${i}">✕</button>
+            <div class="preview-row-fields">
+              <div>
+                <label style="font-size: 0.75rem; color: #666; font-weight: 500; display: block; margin-bottom: 4px;">PIN</label>
+                <input class="input input-small" data-field="pin" value="${escapeHtml(row.pin)}" placeholder="PIN 번호" />
+              </div>
+              <div>
+                <label style="font-size: 0.75rem; color: #666; font-weight: 500; display: block; margin-bottom: 4px;">링크</label>
+                <input class="input input-small" data-field="url" value="${escapeHtml(row.url)}" placeholder="티켓 링크" />
+              </div>
+            </div>
           </div>
         `).join('')}
       </div>
@@ -752,7 +761,9 @@ async function renderStatus(eventId) {
   const receivedNames = new Set(
     tickets.filter((t) => t.status === 'claimed').map((t) => norm(t.receivedBy))
   );
+  const participantSet = new Set((event.participants || []).map((p) => norm(p)));
   const notReceived = (event.participants || []).filter((p) => !receivedNames.has(norm(p)));
+  const receivedButNotParticipant = Array.from(receivedNames).filter((name) => !participantSet.has(name));
 
   app.innerHTML = `
     <section class="view">
@@ -769,6 +780,13 @@ async function renderStatus(eventId) {
           ${notReceived.length
             ? `<ul class="name-list">${notReceived.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}</ul>`
             : '<p class="hint">참석자 명단 기준으로 전원 수령 완료로 보입니다 🎉</p>'}
+        </div>
+      ` : ''}
+
+      ${receivedButNotParticipant.length ? `
+        <div class="card">
+          <h3>참석자가 아닌데 받은 사람 (참고용)</h3>
+          <ul class="name-list">${receivedButNotParticipant.map((n) => `<li>${n}</li>`).join('')}</ul>
         </div>
       ` : ''}
 
