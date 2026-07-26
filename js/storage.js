@@ -1,37 +1,42 @@
-// 데이터 저장 계층. 현재는 localStorage 구현이며, 모든 메서드가 Promise를 반환하도록
-// 맞춰뒀습니다 — 추후 Supabase 등 원격 DB로 교체할 때 이 파일만 바꾸면 되도록 하기 위함입니다.
+// Supabase DB 연결
+const SUPABASE_URL = 'https://nxpmqoglznvabcsdjsxy.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54cG1xb2dsem52YWJjc2Rqc3h5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNTk2MzksImV4cCI6MjEwMDYzNTYzOX0.QfO21vYArfBWryyq67yewDxyGw6ThntbXesg2Nh46Tg';
 
-const EVENTS_KEY = 'dooru_events_v1';
-const TICKETS_KEY = 'dooru_tickets_v1';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function uid() {
   if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
   return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 9);
 }
 
-function read(key) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function write(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
 export const DB = {
   // ---- Events ----
   async getEvents() {
-    return read(EVENTS_KEY);
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .order('date', { ascending: false });
+    if (error) {
+      console.error('Error fetching events:', error);
+      return [];
+    }
+    return data || [];
   },
+
   async getEvent(id) {
-    return read(EVENTS_KEY).find((e) => e.id === id) || null;
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (error) {
+      if (error.code !== 'PGRST116') console.error('Error fetching event:', error);
+      return null;
+    }
+    return data;
   },
+
   async addEvent(data) {
-    const events = read(EVENTS_KEY);
     const event = {
       id: uid(),
       participants: [],
@@ -40,33 +45,55 @@ export const DB = {
       ...data,
       createdAt: new Date().toISOString(),
     };
-    events.push(event);
-    write(EVENTS_KEY, events);
+    const { error } = await supabase.from('events').insert([event]);
+    if (error) {
+      console.error('Error adding event:', error);
+      throw error;
+    }
     return event;
   },
+
   async updateEvent(id, patch) {
-    const events = read(EVENTS_KEY);
-    const idx = events.findIndex((e) => e.id === id);
-    if (idx === -1) throw new Error('Event not found');
-    events[idx] = { ...events[idx], ...patch };
-    write(EVENTS_KEY, events);
-    return events[idx];
+    const { error } = await supabase.from('events').update(patch).eq('id', id);
+    if (error) {
+      console.error('Error updating event:', error);
+      throw error;
+    }
+    const updated = await this.getEvent(id);
+    return updated;
   },
+
   async deleteEvent(id) {
-    write(EVENTS_KEY, read(EVENTS_KEY).filter((e) => e.id !== id));
-    write(TICKETS_KEY, read(TICKETS_KEY).filter((t) => t.eventId !== id));
+    await supabase.from('events').delete().eq('id', id);
+    await supabase.from('tickets').delete().eq('eventId', id);
   },
 
   // ---- Tickets ----
   async getTickets(eventId) {
-    const tickets = read(TICKETS_KEY);
-    return eventId ? tickets.filter((t) => t.eventId === eventId) : tickets;
+    let query = supabase.from('tickets').select('*');
+    if (eventId) query = query.eq('eventId', eventId);
+    const { data, error } = await query.order('registeredAt', { ascending: false });
+    if (error) {
+      console.error('Error fetching tickets:', error);
+      return [];
+    }
+    return data || [];
   },
+
   async getTicket(id) {
-    return read(TICKETS_KEY).find((t) => t.id === id) || null;
+    const { data, error } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (error) {
+      if (error.code !== 'PGRST116') console.error('Error fetching ticket:', error);
+      return null;
+    }
+    return data;
   },
+
   async addTicket(data) {
-    const tickets = read(TICKETS_KEY);
     const ticket = {
       id: uid(),
       status: 'unclaimed',
@@ -75,12 +102,15 @@ export const DB = {
       registeredAt: new Date().toISOString(),
       ...data,
     };
-    tickets.push(ticket);
-    write(TICKETS_KEY, tickets);
+    const { error } = await supabase.from('tickets').insert([ticket]);
+    if (error) {
+      console.error('Error adding ticket:', error);
+      throw error;
+    }
     return ticket;
   },
+
   async addTickets(dataArray) {
-    const tickets = read(TICKETS_KEY);
     const now = new Date().toISOString();
     const newTickets = dataArray.map((data) => ({
       id: uid(),
@@ -90,22 +120,39 @@ export const DB = {
       registeredAt: now,
       ...data,
     }));
-    write(TICKETS_KEY, [...tickets, ...newTickets]);
+    const { error } = await supabase.from('tickets').insert(newTickets);
+    if (error) {
+      console.error('Error adding tickets:', error);
+      throw error;
+    }
     return newTickets;
   },
+
   async updateTicket(id, patch) {
-    const tickets = read(TICKETS_KEY);
-    const idx = tickets.findIndex((t) => t.id === id);
-    if (idx === -1) throw new Error('Ticket not found');
-    tickets[idx] = { ...tickets[idx], ...patch };
-    write(TICKETS_KEY, tickets);
-    return tickets[idx];
+    const { error } = await supabase.from('tickets').update(patch).eq('id', id);
+    if (error) {
+      console.error('Error updating ticket:', error);
+      throw error;
+    }
+    const updated = await this.getTicket(id);
+    return updated;
   },
+
   async deleteTicket(id) {
-    write(TICKETS_KEY, read(TICKETS_KEY).filter((t) => t.id !== id));
+    await supabase.from('tickets').delete().eq('id', id);
   },
+
   async hasDuplicatePin(eventId, pin) {
-    const tickets = read(TICKETS_KEY);
-    return tickets.some((t) => t.eventId === eventId && t.pin === pin);
+    const { data, error } = await supabase
+      .from('tickets')
+      .select('id')
+      .eq('eventId', eventId)
+      .eq('pin', pin)
+      .limit(1);
+    if (error) {
+      console.error('Error checking duplicate PIN:', error);
+      return false;
+    }
+    return (data?.length ?? 0) > 0;
   },
 };
