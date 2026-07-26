@@ -314,15 +314,23 @@ async function renderEventManage() {
 
   document.getElementById('btn-new-event').addEventListener('click', () => navigate({ view: 'event-form', eventId: null }));
   app.querySelectorAll('[data-edit]').forEach((btn) => {
-    btn.addEventListener('click', () => navigate({ view: 'event-form', eventId: btn.dataset.edit }));
+    btn.addEventListener('click', () => {
+      const eventId = btn.dataset.edit;
+      openAdminPasswordModal(() => {
+        navigate({ view: 'event-form', eventId });
+      });
+    });
   });
   app.querySelectorAll('[data-delete]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const event = await DB.getEvent(btn.dataset.delete);
-      if (!confirm(`"${event?.title ?? ''}" 경기를 삭제할까요? 등록된 티켓도 함께 삭제됩니다.`)) return;
-      await DB.deleteEvent(btn.dataset.delete);
-      toast('경기를 삭제했습니다.');
-      renderEventManage();
+    btn.addEventListener('click', () => {
+      const eventId = btn.dataset.delete;
+      openAdminPasswordModal(async () => {
+        const event = await DB.getEvent(eventId);
+        if (!confirm(`"${event?.title ?? ''}" 경기를 삭제할까요? 등록된 티켓도 함께 삭제됩니다.`)) return;
+        await DB.deleteEvent(eventId);
+        toast('경기를 삭제했습니다.');
+        renderEventManage();
+      });
     });
   });
 }
