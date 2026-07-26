@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s https://nxpmqoglznvabcsdjsxy.supabase.co/rest/v1/events -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54cG1xb2dsem52YWJjc2Rqc3h5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNTk2MzksImV4cCI6MjEwMDYzNTYzOX0.QfO21vYArfBWryyq67yewDxyGw6ThntbXesg2Nh46Tg' -H 'Content-Type: application/json')",
+      "Bash(curl -s https://nxpmqoglznvabcsdjsxy.supabase.co/rest/v1/events -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54cG1xb2dsem52YWJjc2Rqc3h5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNTk2MzksImV4cCI6MjEwMDYzNTYzOX0.QfO21vYArfBWryyq67yewDxyGw6ThntbXesg2Nh46Tg' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54cG1xb2dsem52YWJjc2Rqc3h5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNTk2MzksImV4cCI6MjEwMDYzNTYzOX0.QfO21vYArfBWryyq67yewDxyGw6ThntbXesg2Nh46Tg' -H 'Content-Type: application/json')",
+      "Bash(curl -s http://localhost:8001/test-supabase.html)"
+    ]
+  }
+}

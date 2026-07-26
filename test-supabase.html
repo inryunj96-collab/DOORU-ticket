@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Supabase 연결 테스트</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <h1>Supabase 연결 테스트</h1>
+  <div id="result"></div>
+
+  <script>
+    const SUPABASE_URL = 'https://nxpmqoglznvabcsdjsxy.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54cG1xb2dsem52YWJjc2Rqc3h5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNTk2MzksImV4cCI6MjEwMDYzNTYzOX0.QfO21vYArfBWryyq67yewDxyGw6ThntbXesg2Nh46Tg';
+
+    const resultDiv = document.getElementById('result');
+
+    async function test() {
+      try {
+        resultDiv.innerHTML += '<p>Supabase 라이브러리 로드 확인...</p>';
+        const { createClient } = window.supabase;
+        console.log('createClient:', createClient);
+        resultDiv.innerHTML += '<p>✓ Supabase 라이브러리 로드 완료</p>';
+
+        resultDiv.innerHTML += '<p>클라이언트 생성...</p>';
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+        console.log('supabase client:', supabase);
+        resultDiv.innerHTML += '<p>✓ 클라이언트 생성 완료</p>';
+
+        resultDiv.innerHTML += '<p>Events 테이블 조회 중...</p>';
+        const { data, error } = await supabase.from('events').select('*');
+
+        if (error) {
+          resultDiv.innerHTML += `<p>✗ 에러: ${error.message}</p>`;
+          console.error('Error:', error);
+        } else {
+          resultDiv.innerHTML += `<p>✓ Events 조회 성공! (${data?.length || 0}개)</p>`;
+          console.log('Data:', data);
+        }
+
+        resultDiv.innerHTML += '<p>Tickets 테이블 조회 중...</p>';
+        const { data: ticketsData, error: ticketsError } = await supabase.from('tickets').select('*');
+
+        if (ticketsError) {
+          resultDiv.innerHTML += `<p>✗ 에러: ${ticketsError.message}</p>`;
+          console.error('Error:', ticketsError);
+        } else {
+          resultDiv.innerHTML += `<p>✓ Tickets 조회 성공! (${ticketsData?.length || 0}개)</p>`;
+          console.log('Data:', ticketsData);
+        }
+
+        resultDiv.innerHTML += '<p style="color: green; font-weight: bold;">✓ 모든 테스트 완료!</p>';
+      } catch (err) {
+        resultDiv.innerHTML += `<p style="color: red;">✗ 오류 발생: ${err.message}</p>`;
+        console.error('Error:', err);
+      }
+    }
+
+    window.addEventListener('load', test);
+  </script>
+</body>
+</html>

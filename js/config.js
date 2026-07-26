@@ -1,3 +1,7 @@
+// Supabase 설정
+export const SUPABASE_URL = 'https://nxpmqoglznvabcsdjsxy.supabase.co';
+export const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54cG1xb2dsem52YWJjc2Rqc3h5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNTk2MzksImV4cCI6MjEwMDYzNTYzOX0.QfO21vYArfBWryyq67yewDxyGw6ThntbXesg2Nh46Tg';
+
 // 모임 공용 암호. 필요 시 이 값만 바꾸면 됩니다.
 export const APP_PASSWORD = '0302';
 export const ADMIN_PASSWORD = '03020302';

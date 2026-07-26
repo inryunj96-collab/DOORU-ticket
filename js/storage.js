@@ -1,12 +1,53 @@
-// Supabase DB 연결
-const SUPABASE_URL = 'https://nxpmqoglznvabcsdjsxy.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54cG1xb2dsem52YWJjc2Rqc3h5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwNTk2MzksImV4cCI6MjEwMDYzNTYzOX0.QfO21vYArfBWryyq67yewDxyGw6ThntbXesg2Nh46Tg';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// Supabase 클라이언트 초기화
+const { createClient } = window.supabase;
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function uid() {
   if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
   return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 9);
+}
+
+// DB의 snake_case를 앱의 camelCase로 변환
+function eventFromDB(dbEvent) {
+  if (!dbEvent) return null;
+  return {
+    ...dbEvent,
+    createdAt: dbEvent.createdat,
+  };
+}
+
+function eventToDB(appEvent) {
+  const { createdat, createdAt, ...rest } = appEvent;
+  return {
+    ...rest,
+    createdat: createdAt || createdat,
+  };
+}
+
+function ticketFromDB(dbTicket) {
+  if (!dbTicket) return null;
+  return {
+    ...dbTicket,
+    eventId: dbTicket.eventid,
+    registeredBy: dbTicket.registeredby,
+    receivedBy: dbTicket.receivedby,
+    receivedAt: dbTicket.receivedat,
+    registeredAt: dbTicket.registeredat,
+  };
+}
+
+function ticketToDB(appTicket) {
+  const { eventid, registeredby, receivedby, receivedat, registeredat, ...rest } = appTicket;
+  return {
+    ...rest,
+    eventid: appTicket.eventId,
+    registeredby: appTicket.registeredBy,
+    receivedby: appTicket.receivedBy,
+    receivedat: appTicket.receivedAt,
+    registeredat: appTicket.registeredAt,
+  };
 }
 
 export const DB = {
@@ -20,7 +61,7 @@ export const DB = {
       console.error('Error fetching events:', error);
       return [];
     }
-    return data || [];
+    return (data || []).map(eventFromDB);
   },
 
   async getEvent(id) {
@@ -33,7 +74,7 @@ export const DB = {
       if (error.code !== 'PGRST116') console.error('Error fetching event:', error);
       return null;
     }
-    return data;
+    return eventFromDB(data);
   },
 
   async addEvent(data) {
@@ -45,7 +86,8 @@ export const DB = {
       ...data,
       createdAt: new Date().toISOString(),
     };
-    const { error } = await supabase.from('events').insert([event]);
+    const dbEvent = eventToDB(event);
+    const { error } = await supabase.from('events').insert([dbEvent]);
     if (error) {
       console.error('Error adding event:', error);
       throw error;
@@ -54,7 +96,8 @@ export const DB = {
   },
 
   async updateEvent(id, patch) {
-    const { error } = await supabase.from('events').update(patch).eq('id', id);
+    const dbPatch = eventToDB(patch);
+    const { error } = await supabase.from('events').update(dbPatch).eq('id', id);
     if (error) {
       console.error('Error updating event:', error);
       throw error;
@@ -65,19 +108,19 @@ export const DB = {
 
   async deleteEvent(id) {
     await supabase.from('events').delete().eq('id', id);
-    await supabase.from('tickets').delete().eq('eventId', id);
+    await supabase.from('tickets').delete().eq('eventid', id);
   },
 
   // ---- Tickets ----
   async getTickets(eventId) {
     let query = supabase.from('tickets').select('*');
-    if (eventId) query = query.eq('eventId', eventId);
-    const { data, error } = await query.order('registeredAt', { ascending: false });
+    if (eventId) query = query.eq('eventid', eventId);
+    const { data, error } = await query.order('registeredat', { ascending: false });
     if (error) {
       console.error('Error fetching tickets:', error);
       return [];
     }
-    return data || [];
+    return (data || []).map(ticketFromDB);
   },
 
   async getTicket(id) {
@@ -90,7 +133,7 @@ export const DB = {
       if (error.code !== 'PGRST116') console.error('Error fetching ticket:', error);
       return null;
     }
-    return data;
+    return ticketFromDB(data);
   },
 
   async addTicket(data) {
@@ -102,7 +145,8 @@ export const DB = {
       registeredAt: new Date().toISOString(),
       ...data,
     };
-    const { error } = await supabase.from('tickets').insert([ticket]);
+    const dbTicket = ticketToDB(ticket);
+    const { error } = await supabase.from('tickets').insert([dbTicket]);
     if (error) {
       console.error('Error adding ticket:', error);
       throw error;
@@ -120,7 +164,8 @@ export const DB = {
       registeredAt: now,
       ...data,
     }));
-    const { error } = await supabase.from('tickets').insert(newTickets);
+    const dbTickets = newTickets.map(ticketToDB);
+    const { error } = await supabase.from('tickets').insert(dbTickets);
     if (error) {
       console.error('Error adding tickets:', error);
       throw error;
@@ -129,7 +174,8 @@ export const DB = {
   },
 
   async updateTicket(id, patch) {
-    const { error } = await supabase.from('tickets').update(patch).eq('id', id);
+    const dbPatch = ticketToDB(patch);
+    const { error } = await supabase.from('tickets').update(dbPatch).eq('id', id);
     if (error) {
       console.error('Error updating ticket:', error);
       throw error;
@@ -146,7 +192,7 @@ export const DB = {
     const { data, error } = await supabase
       .from('tickets')
       .select('id')
-      .eq('eventId', eventId)
+      .eq('eventid', eventId)
       .eq('pin', pin)
       .limit(1);
     if (error) {
