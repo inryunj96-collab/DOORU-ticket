@@ -18,7 +18,7 @@ export function parseNolMessages(text) {
   let match;
   while ((match = regex.exec(text)) !== null) {
     results.push({
-      registeredBy: match[1].trim(),
+      registeredBy: '',
       eventNameRef: match[2].trim(),
       pin: match[3].trim(),
       url: match[4].trim(),

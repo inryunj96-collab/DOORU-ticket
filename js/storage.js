@@ -1,204 +1,241 @@
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 
-// Supabase 클라이언트 초기화
-const { createClient } = window.supabase;
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
 function uid() {
   if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
   return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 9);
 }
 
-// DB의 snake_case를 앱의 camelCase로 변환
-function eventFromDB(dbEvent) {
-  if (!dbEvent) return null;
+// Event 변환 함수 (DB → App)
+function eventFromDB(event) {
+  if (!event) return null;
   return {
-    ...dbEvent,
-    createdAt: dbEvent.createdat,
+    ...event,
+    participants: typeof event.participants === 'string'
+      ? JSON.parse(event.participants || '[]')
+      : (event.participants || []),
   };
 }
 
-function eventToDB(appEvent) {
-  const { createdat, createdAt, ...rest } = appEvent;
+// Ticket 변환 함수 (snake_case → camelCase)
+function ticketFromDB(ticket) {
+  if (!ticket) return null;
   return {
-    ...rest,
-    createdat: createdAt || createdat,
+    ...ticket,
+    eventId: ticket.eventid,
+    registeredBy: ticket.registeredby,
+    receivedBy: ticket.receivedby,
+    receivedAt: ticket.receivedat,
+    registeredAt: ticket.registeredat,
   };
 }
 
-function ticketFromDB(dbTicket) {
-  if (!dbTicket) return null;
-  return {
-    ...dbTicket,
-    eventId: dbTicket.eventid,
-    registeredBy: dbTicket.registeredby,
-    receivedBy: dbTicket.receivedby,
-    receivedAt: dbTicket.receivedat,
-    registeredAt: dbTicket.registeredat,
+// REST API 헬퍼 함수
+async function apiCall(path, method = 'GET', body = null) {
+  const options = {
+    method,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+    },
   };
-}
+  if (body) options.body = JSON.stringify(body);
 
-function ticketToDB(appTicket) {
-  const { eventid, registeredby, receivedby, receivedat, registeredat, ...rest } = appTicket;
-  return {
-    ...rest,
-    eventid: appTicket.eventId,
-    registeredby: appTicket.registeredBy,
-    receivedby: appTicket.receivedBy,
-    receivedat: appTicket.receivedAt,
-    registeredat: appTicket.registeredAt,
-  };
+  const response = await fetch(`${SUPABASE_URL}/rest/v1${path}`, options);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || `API error: ${response.status}`);
+  }
+
+  // 204 No Content 또는 빈 응답 처리
+  if (response.status === 204) return null;
+
+  const text = await response.text();
+  if (!text) return null;
+
+  return JSON.parse(text);
 }
 
 export const DB = {
   // ---- Events ----
   async getEvents() {
-    const { data, error } = await supabase
-      .from('events')
-      .select('*')
-      .order('date', { ascending: false });
-    if (error) {
-      console.error('Error fetching events:', error);
+    try {
+      const data = await apiCall('/events?order=date.desc') || [];
+      return data.map(eventFromDB);
+    } catch (err) {
+      console.error('getEvents error:', err);
       return [];
     }
-    return (data || []).map(eventFromDB);
   },
 
   async getEvent(id) {
-    const { data, error } = await supabase
-      .from('events')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error) {
-      if (error.code !== 'PGRST116') console.error('Error fetching event:', error);
+    try {
+      const results = await apiCall(`/events?id=eq.${id}&limit=1`);
+      return eventFromDB(results?.[0] || null);
+    } catch (err) {
+      console.error('getEvent error:', err);
       return null;
     }
-    return eventFromDB(data);
   },
 
   async addEvent(data) {
-    const event = {
-      id: uid(),
-      participants: [],
-      result: '',
-      leader: '',
-      ...data,
-      createdAt: new Date().toISOString(),
-    };
-    const dbEvent = eventToDB(event);
-    const { error } = await supabase.from('events').insert([dbEvent]);
-    if (error) {
-      console.error('Error adding event:', error);
-      throw error;
+    try {
+      const { participants, ...rest } = data;
+      const event = {
+        id: uid(),
+        result: data.result || '',
+        leader: data.leader || '',
+        ...rest,
+        participants: JSON.stringify(participants || []),
+        createdat: new Date().toISOString(),
+      };
+      console.log('Adding event:', event);
+      await apiCall('/events', 'POST', [event]);
+      return event;
+    } catch (err) {
+      console.error('addEvent error:', err);
+      throw new Error('경기 등록 실패: ' + err.message);
     }
-    return event;
   },
 
   async updateEvent(id, patch) {
-    const dbPatch = eventToDB(patch);
-    const { error } = await supabase.from('events').update(dbPatch).eq('id', id);
-    if (error) {
-      console.error('Error updating event:', error);
-      throw error;
+    try {
+      const { participants, ...rest } = patch;
+      const dbPatch = {
+        ...rest,
+        participants: typeof participants === 'string'
+          ? participants
+          : JSON.stringify(participants || []),
+      };
+      console.log('Updating event:', dbPatch);
+      await apiCall(`/events?id=eq.${id}`, 'PATCH', dbPatch);
+      return this.getEvent(id);
+    } catch (err) {
+      console.error('updateEvent error:', err);
+      throw err;
     }
-    const updated = await this.getEvent(id);
-    return updated;
   },
 
   async deleteEvent(id) {
-    await supabase.from('events').delete().eq('id', id);
-    await supabase.from('tickets').delete().eq('eventid', id);
+    try {
+      await apiCall(`/events?id=eq.${id}`, 'DELETE');
+      await apiCall(`/tickets?eventid=eq.${id}`, 'DELETE');
+    } catch (err) {
+      console.error('deleteEvent error:', err);
+      throw err;
+    }
   },
 
   // ---- Tickets ----
   async getTickets(eventId) {
-    let query = supabase.from('tickets').select('*');
-    if (eventId) query = query.eq('eventid', eventId);
-    const { data, error } = await query.order('registeredat', { ascending: false });
-    if (error) {
-      console.error('Error fetching tickets:', error);
+    try {
+      const query = eventId
+        ? `/tickets?eventid=eq.${eventId}&order=registeredat.desc`
+        : '/tickets?order=registeredat.desc';
+      const data = await apiCall(query) || [];
+      return data.map(ticketFromDB);
+    } catch (err) {
+      console.error('getTickets error:', err);
       return [];
     }
-    return (data || []).map(ticketFromDB);
   },
 
   async getTicket(id) {
-    const { data, error } = await supabase
-      .from('tickets')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error) {
-      if (error.code !== 'PGRST116') console.error('Error fetching ticket:', error);
+    try {
+      const results = await apiCall(`/tickets?id=eq.${id}&limit=1`);
+      return ticketFromDB(results?.[0] || null);
+    } catch (err) {
+      console.error('getTicket error:', err);
       return null;
     }
-    return ticketFromDB(data);
   },
 
   async addTicket(data) {
-    const ticket = {
-      id: uid(),
-      status: 'unclaimed',
-      receivedBy: null,
-      receivedAt: null,
-      registeredAt: new Date().toISOString(),
-      ...data,
-    };
-    const dbTicket = ticketToDB(ticket);
-    const { error } = await supabase.from('tickets').insert([dbTicket]);
-    if (error) {
-      console.error('Error adding ticket:', error);
-      throw error;
+    try {
+      const ticket = {
+        id: uid(),
+        eventid: data.eventId || data.eventid,
+        registeredby: data.registeredBy || data.registeredby,
+        pin: data.pin,
+        url: data.url,
+        status: 'unclaimed',
+        receivedby: null,
+        receivedat: null,
+        registeredat: new Date().toISOString(),
+      };
+      console.log('Adding ticket:', ticket);
+      await apiCall('/tickets', 'POST', [ticket]);
+      return ticket;
+    } catch (err) {
+      console.error('addTicket error:', err);
+      throw err;
     }
-    return ticket;
   },
 
   async addTickets(dataArray) {
-    const now = new Date().toISOString();
-    const newTickets = dataArray.map((data) => ({
-      id: uid(),
-      status: 'unclaimed',
-      receivedBy: null,
-      receivedAt: null,
-      registeredAt: now,
-      ...data,
-    }));
-    const dbTickets = newTickets.map(ticketToDB);
-    const { error } = await supabase.from('tickets').insert(dbTickets);
-    if (error) {
-      console.error('Error adding tickets:', error);
-      throw error;
+    try {
+      const now = new Date().toISOString();
+      const tickets = dataArray.map((data) => ({
+        id: uid(),
+        eventid: data.eventId,  // camelCase → snake_case
+        registeredby: data.registeredBy || data.registeredby,
+        pin: data.pin,
+        url: data.url,
+        status: 'unclaimed',
+        receivedby: null,
+        receivedat: null,
+        registeredat: now,
+      }));
+      console.log('Adding tickets:', tickets);
+      await apiCall('/tickets', 'POST', tickets);
+      return tickets;
+    } catch (err) {
+      console.error('addTickets error:', err);
+      throw new Error('티켓 등록 실패: ' + err.message);
     }
-    return newTickets;
   },
 
   async updateTicket(id, patch) {
-    const dbPatch = ticketToDB(patch);
-    const { error } = await supabase.from('tickets').update(dbPatch).eq('id', id);
-    if (error) {
-      console.error('Error updating ticket:', error);
-      throw error;
+    try {
+      // camelCase → snake_case 변환
+      const dbPatch = {};
+      if (patch.receivedBy !== undefined) dbPatch.receivedby = patch.receivedBy;
+      if (patch.receivedAt !== undefined) dbPatch.receivedat = patch.receivedAt;
+      if (patch.status !== undefined) dbPatch.status = patch.status;
+      // 다른 필드들은 그대로 복사
+      Object.keys(patch).forEach(key => {
+        if (!['receivedBy', 'receivedAt'].includes(key)) {
+          dbPatch[key] = patch[key];
+        }
+      });
+      console.log('Updating ticket:', dbPatch);
+      await apiCall(`/tickets?id=eq.${id}`, 'PATCH', dbPatch);
+      return this.getTicket(id);
+    } catch (err) {
+      console.error('updateTicket error:', err);
+      throw err;
     }
-    const updated = await this.getTicket(id);
-    return updated;
   },
 
   async deleteTicket(id) {
-    await supabase.from('tickets').delete().eq('id', id);
+    try {
+      await apiCall(`/tickets?id=eq.${id}`, 'DELETE');
+    } catch (err) {
+      console.error('deleteTicket error:', err);
+      throw err;
+    }
   },
 
   async hasDuplicatePin(eventId, pin) {
-    const { data, error } = await supabase
-      .from('tickets')
-      .select('id')
-      .eq('eventid', eventId)
-      .eq('pin', pin)
-      .limit(1);
-    if (error) {
-      console.error('Error checking duplicate PIN:', error);
+    try {
+      const results = await apiCall(
+        `/tickets?eventid=eq.${eventId}&pin=eq.${encodeURIComponent(pin)}&limit=1`
+      );
+      return (results?.length ?? 0) > 0;
+    } catch (err) {
+      console.error('hasDuplicatePin error:', err);
       return false;
     }
-    return (data?.length ?? 0) > 0;
   },
 };

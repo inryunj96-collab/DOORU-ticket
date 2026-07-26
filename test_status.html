@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>현황조회 테스트</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <h1>현황조회 테스트</h1>
+  <pre id="result"></pre>
+
+  <script type="module">
+    import { SUPABASE_URL, SUPABASE_KEY } from 'http://localhost:8001/js/config.js';
+    
+    const resultDiv = document.getElementById('result');
+
+    async function apiCall(path, method = 'GET', body = null) {
+      const options = {
+        method,
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      };
+      if (body) options.body = JSON.stringify(body);
+
+      const response = await fetch(SUPABASE_URL + '/rest/v1' + path, options);
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      
+      const text = await response.text();
+      if (!text) return null;
+      return JSON.parse(text);
+    }
+
+    async function test() {
+      try {
+        resultDiv.textContent += '1. 경기 조회 중...\n';
+        const events = await apiCall('/events?limit=1');
+        const event = events[0];
+        
+        resultDiv.textContent += `✓ 경기: ${event.title}\n`;
+        resultDiv.textContent += `  - Participants 타입: ${typeof event.participants}\n`;
+        resultDiv.textContent += `  - Participants 값: ${event.participants}\n\n`;
+
+        resultDiv.textContent += '2. 티켓 조회 중...\n';
+        const tickets = await apiCall(`/tickets?eventid=eq.${event.id}`);
+        
+        resultDiv.textContent += `✓ 티켓 ${tickets.length}개 조회됨\n`;
+        
+        const claimed = tickets.filter(t => t.status === 'claimed').length;
+        const unclaimed = tickets.length - claimed;
+        
+        resultDiv.textContent += `  - 수령완료: ${claimed}개\n`;
+        resultDiv.textContent += `  - 미수령: ${unclaimed}개\n\n`;
+
+        resultDiv.textContent += '3. Participants 파싱 테스트\n';
+        const participants = typeof event.participants === 'string' 
+          ? JSON.parse(event.participants)
+          : event.participants;
+        resultDiv.textContent += `  - 파싱 후: ${JSON.stringify(participants)}\n`;
+        resultDiv.textContent += `  - 타입: ${Array.isArray(participants) ? '배열' : '배열 아님'}\n\n`;
+
+        resultDiv.textContent += '✅ 현황조회 정상 작동!\n';
+      } catch (err) {
+        resultDiv.textContent += `❌ 에러: ${err.message}`;
+      }
+    }
+
+    test();
+  </script>
+</body>
+</html>

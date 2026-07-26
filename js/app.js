@@ -434,29 +434,34 @@ async function renderEventForm(eventId) {
   document.getElementById('f-cancel').addEventListener('click', goBack);
   document.getElementById('event-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const home = homeSelect.value.trim();
-    const away = awaySelect.value.trim();
-    if (!home || !away || home === away) {
-      toast('홈팀과 원정팀을 다르게 선택해주세요.');
-      return;
+    try {
+      const home = homeSelect.value.trim();
+      const away = awaySelect.value.trim();
+      if (!home || !away || home === away) {
+        toast('홈팀과 원정팀을 다르게 선택해주세요.');
+        return;
+      }
+      const data = {
+        title: `${home} vs ${away}`,
+        date: document.getElementById('f-date').value,
+        time: document.getElementById('f-time').value,
+        stadium: stadiumInput.value.trim(),
+        leader: document.getElementById('f-leader').value.trim(),
+        participants: document.getElementById('f-participants').value
+          .split('\n').map((s) => s.trim()).filter(Boolean),
+      };
+      if (isEdit) {
+        await DB.updateEvent(eventId, data);
+        toast('경기 정보를 저장했습니다.');
+      } else {
+        await DB.addEvent(data);
+        toast('새 경기를 등록했습니다.');
+      }
+      goBack();
+    } catch (err) {
+      console.error('경기 등록 에러:', err);
+      toast('오류가 발생했습니다: ' + err.message);
     }
-    const data = {
-      title: `${home} vs ${away}`,
-      date: document.getElementById('f-date').value,
-      time: document.getElementById('f-time').value,
-      stadium: stadiumInput.value.trim(),
-      leader: document.getElementById('f-leader').value.trim(),
-      participants: document.getElementById('f-participants').value
-        .split('\n').map((s) => s.trim()).filter(Boolean),
-    };
-    if (isEdit) {
-      await DB.updateEvent(eventId, data);
-      toast('경기 정보를 저장했습니다.');
-    } else {
-      await DB.addEvent(data);
-      toast('새 경기를 등록했습니다.');
-    }
-    goBack();
   });
 }
 
@@ -547,7 +552,6 @@ async function renderTicketRegister(eventId, actorName) {
         ${parsedRows.map((row, i) => `
           <div class="preview-row" data-idx="${i}">
             <div class="preview-row-fields">
-              <input class="input input-small" data-field="registeredBy" value="${escapeHtml(row.registeredBy)}" placeholder="등록자" />
               <input class="input input-small" data-field="pin" value="${escapeHtml(row.pin)}" placeholder="PIN" />
               <input class="input input-small" data-field="url" value="${escapeHtml(row.url)}" placeholder="링크" />
             </div>
@@ -566,34 +570,56 @@ async function renderTicketRegister(eventId, actorName) {
       });
     });
     preview.querySelectorAll('[data-remove]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        parsedRows.splice(Number(btn.dataset.remove), 1);
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const idx = Number(btn.dataset.remove);
+        parsedRows.splice(idx, 1);
         renderPreview();
       });
     });
-    document.getElementById('btn-commit-bulk').addEventListener('click', async () => {
-      const toAdd = parsedRows
-        .filter((r) => r.pin && r.url)
-        .map((r) => ({ eventId, pin: r.pin, url: r.url, registeredBy: actorName }));
-      if (toAdd.length === 0) { toast('등록할 항목이 없습니다.'); return; }
 
-      const duplicates = [];
-      for (const item of toAdd) {
-        if (await DB.hasDuplicatePin(eventId, item.pin)) {
-          duplicates.push(item.pin);
+    const commitBtn = document.getElementById('btn-commit-bulk');
+    if (commitBtn) {
+      commitBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        try {
+          console.log('일괄등록 시작, parsedRows:', parsedRows);
+          const toAdd = parsedRows
+            .filter((r) => r.pin && r.url)
+            .map((r) => ({
+              eventId,
+              pin: r.pin,
+              url: r.url,
+              registeredBy: actorName
+            }));
+          console.log('등록할 항목:', toAdd);
+          if (toAdd.length === 0) { toast('등록할 항목이 없습니다.'); return; }
+
+          const duplicates = [];
+          for (const item of toAdd) {
+            if (await DB.hasDuplicatePin(eventId, item.pin)) {
+              duplicates.push(item.pin);
+            }
+          }
+          if (duplicates.length > 0) {
+            toast(`PIN ${duplicates.join(', ')}은 이미 등록된 티켓입니다.`);
+            return;
+          }
+
+          console.log('DB에 등록 중...');
+          await DB.addTickets(toAdd);
+          console.log('등록 완료');
+          toast(`${toAdd.length}건 등록 완료`);
+          parsedRows = [];
+          document.getElementById('paste-area').value = '';
+          renderPreview();
+          renderTicketRegister(eventId, actorName);
+        } catch (err) {
+          console.error('일괄등록 에러:', err);
+          toast('등록 중 오류가 발생했습니다: ' + err.message);
         }
-      }
-      if (duplicates.length > 0) {
-        toast(`PIN ${duplicates.join(', ')}은 이미 등록된 티켓입니다.`);
-        return;
-      }
-
-      await DB.addTickets(toAdd);
-      toast(`${toAdd.length}건 등록 완료`);
-      parsedRows = [];
-      document.getElementById('paste-area').value = '';
-      renderPreview();
-    });
+      });
+    }
   }
 
   document.getElementById('btn-parse').addEventListener('click', () => {
