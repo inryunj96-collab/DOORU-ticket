@@ -2,53 +2,6 @@ import { APP_PASSWORD, ADMIN_PASSWORD, TEAMS, getStadium } from './config.js';
 import { DB } from './storage.js';
 import { parseNolMessages } from './parser.js';
 
-// ---------- 테마 설정 ----------
-
-function initTheme() {
-  const savedTheme = localStorage.getItem('app-theme') || 'default';
-  applyTheme(savedTheme);
-}
-
-function applyTheme(theme) {
-  if (theme === 'default') {
-    document.documentElement.removeAttribute('data-theme');
-  } else {
-    document.documentElement.setAttribute('data-theme', theme);
-  }
-  localStorage.setItem('app-theme', theme);
-  updateThemeMenuButtons(theme);
-}
-
-function updateThemeMenuButtons(theme) {
-  document.querySelectorAll('.theme-option').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.theme === theme);
-  });
-}
-
-function setupThemeMenu() {
-  const themeBtn = document.getElementById('btn-theme');
-  const themeMenu = document.getElementById('theme-menu');
-
-  if (themeBtn && themeMenu) {
-    themeBtn.addEventListener('click', () => {
-      themeMenu.hidden = !themeMenu.hidden;
-    });
-
-    document.addEventListener('click', (e) => {
-      if (e.target !== themeBtn && !themeMenu.contains(e.target)) {
-        themeMenu.hidden = true;
-      }
-    });
-
-    document.querySelectorAll('.theme-option').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        applyTheme(btn.dataset.theme);
-        themeMenu.hidden = true;
-      });
-    });
-  }
-}
-
 // ---------- 공통 유틸 ----------
 
 function escapeHtml(str) {
@@ -945,7 +898,7 @@ function ticketRowHtml(ticket) {
       <td>${ticket.receivedBy ? escapeHtml(ticket.receivedBy) : '<span class="text-danger">미수령</span>'}</td>
       <td>${formatDateTime(ticket.receivedAt)}</td>
       <td class="row-actions">
-        <a href="${escapeHtml(ticket.url)}" target="_blank" rel="noopener" class="icon-btn" aria-label="티켓보기" title="새 탭에서 열기">🎟</a>
+        ${ticket.url ? `<a href="${escapeHtml(ticket.url)}" target="_blank" rel="noopener" class="icon-btn" aria-label="티켓보기" title="새 탭에서 열기">🎟</a>` : ''}
         <button class="icon-btn ticket-action-btn" data-edit-ticket="${ticket.id}" aria-label="수정" hidden>✎</button>
         ${claimed ? `<button class="icon-btn ticket-action-btn" data-reset-ticket="${ticket.id}" aria-label="초기화" title="수령 초기화" hidden>↺</button>` : ''}
         <button class="icon-btn ticket-action-btn" data-delete-ticket="${ticket.id}" aria-label="삭제" hidden>🗑</button>
@@ -992,6 +945,4 @@ async function openTicketEditModal(ticketId, eventId) {
 
 // ---------- 시작 ----------
 
-initTheme();
-setupThemeMenu();
 navigate({ view: 'home' }, { replace: true });
